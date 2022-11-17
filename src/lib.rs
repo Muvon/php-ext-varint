@@ -29,11 +29,11 @@ impl VarInt {
 
     #[public]
     pub fn pack_int(value: i64) -> Binary<u8> {
-        let mut ux: i128 = (value as i128) << 1i128;
+        let mut ux: u64 = (value as u64) << 1u64;
         if value < 0 {
             ux = !ux;
         }
-        Self::pack_uint(ux as u64)
+        Self::pack_uint(ux)
     }
 
     #[public]
