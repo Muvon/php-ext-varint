@@ -1,5 +1,6 @@
 #![cfg_attr(windows, feature(abi_vectorcall))]
 use ext_php_rs::{prelude::*, binary::Binary};
+use faster_hex::{hex_string, hex_decode_fallback};
 use std::str;
 
 #[php_class]
@@ -22,12 +23,22 @@ impl VarInt {
     }
 
     #[public]
+    pub fn pack_uint_hex(value: u64) -> String {
+        hex_string(Self::pack_uint(value).as_slice())
+    }
+
+    #[public]
     pub fn pack_int(value: i64) -> Binary<u8> {
         let mut ux: i128 = (value as i128) << 1i128;
         if value < 0 {
             ux = !ux;
         }
         Self::pack_uint(ux as u64)
+    }
+
+    #[public]
+    pub fn pack_int_hex(value: i64) -> String {
+        hex_string(Self::pack_int(value).as_slice())
     }
 
     #[public]
@@ -58,6 +69,13 @@ impl VarInt {
     }
 
     #[public]
+    pub fn read_uint_hex(hex: String, offset: Option<u64>, max_len: Option<u64>) -> Vec<u64> {
+        let mut dst = Vec::with_capacity(hex.len() / 2);
+        hex_decode_fallback(hex.as_bytes(), &mut dst);
+        Self::read_uint(Binary::new(dst), offset, max_len)
+    }
+
+    #[public]
     pub fn read_int(bin: Binary<u8>, offset: Option<u64>, max_len: Option<u64>) -> Vec<i64> {
         let input = Self::read_uint(bin, offset, max_len);
         let (ux, offset) = match input[..] {
@@ -75,8 +93,22 @@ impl VarInt {
     }
 
     #[public]
+    pub fn read_int_hex(hex: String, offset: Option<u64>, max_len: Option<u64>) -> Vec<i64> {
+        let mut dst = Vec::with_capacity(hex.len() / 2);
+        hex_decode_fallback(hex.as_bytes(), &mut dst);
+        Self::read_int(Binary::new(dst), offset, max_len)
+    }
+
+    #[public]
     pub fn read_bool(bin: Binary<u8>, offset: Option<u64>) -> Vec<u64> {
         Self::read_uint(bin, offset, Some(0u64))
+    }
+
+    #[public]
+    pub fn read_bool_hex(hex: String, offset: Option<u64>) -> Vec<u64> {
+        let mut dst = Vec::with_capacity(hex.len() / 2);
+        hex_decode_fallback(hex.as_bytes(), &mut dst);
+        Self::read_bool(Binary::new(dst), offset)
     }
 }
 
@@ -101,8 +133,18 @@ pub fn varint_read_int(bin: Binary<u8>, offset: Option<u64>, max_len: Option<u64
 }
 
 #[php_function]
+pub fn varint_read_int_hex(hex: String, offset: Option<u64>, max_len: Option<u64>) -> Vec<i64> {
+    VarInt::read_int_hex(hex, offset, max_len)
+}
+
+#[php_function]
 pub fn varint_read_bool(bin: Binary<u8>, offset: Option<u64>) -> Vec<u64> {
     VarInt::read_bool(bin, offset)
+}
+
+#[php_function]
+pub fn varint_read_bool_hex(hex: String, offset: Option<u64>) -> Vec<u64> {
+    VarInt::read_bool_hex(hex, offset)
 }
 
 #[php_module]
@@ -112,18 +154,12 @@ pub fn get_module(module: ModuleBuilder) -> ModuleBuilder {
 
 #[cfg(test)]
 mod tests {
-    use faster_hex::hex_string;
-
     use super::*;
-
-    fn binary_to_hex(input: Binary<u8>) -> String {
-        hex_string(input.as_slice()).to_lowercase()
-    }
 
     #[test]
     pub fn test_pack_zero_unsigned_int() -> () {
         assert_eq!(
-            binary_to_hex(VarInt::pack_uint(0)),
+            VarInt::pack_uint_hex(0),
             "00"
         );
     }
@@ -131,17 +167,17 @@ mod tests {
     #[test]
     pub fn test_pack_non_zero_unsigned_ints() -> () {
         assert_eq!(
-            binary_to_hex(VarInt::pack_uint(35442)),
+            VarInt::pack_uint_hex(35442),
             "f29402"
         );
 
         assert_eq!(
-            binary_to_hex(VarInt::pack_uint(523472346)),
+            VarInt::pack_uint_hex(523472346),
             "da9bcef901"
         );
 
         assert_eq!(
-            binary_to_hex(VarInt::pack_uint(23425234862394)),
+            VarInt::pack_uint_hex(23425234862394),
             "ba82b6e6e1a905"
         );
     }
@@ -150,7 +186,7 @@ mod tests {
     #[test]
     pub fn test_pack_zero_signed_int() -> () {
         assert_eq!(
-            binary_to_hex(VarInt::pack_int(0)),
+            VarInt::pack_int_hex(0),
             "00"
         );
     }
@@ -158,17 +194,17 @@ mod tests {
     #[test]
     pub fn test_pack_non_zero_signed_ints() -> () {
         assert_eq!(
-            binary_to_hex(VarInt::pack_int(35442)),
+            VarInt::pack_int_hex(35442),
             "e4a904"
         );
 
         assert_eq!(
-            binary_to_hex(VarInt::pack_int(-523472346)),
+            VarInt::pack_int_hex(-523472346),
             "b3b79cf303"
         );
 
         assert_eq!(
-            binary_to_hex(VarInt::pack_int(-34235)),
+            VarInt::pack_int_hex(-34235),
             "f59604"
         );
     }
