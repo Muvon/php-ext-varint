@@ -1,0 +1,5 @@
+{
+    "require": {
+        "muvon/kiss-varint": "^0.3.0"
+    }
+}

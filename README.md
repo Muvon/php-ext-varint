@@ -1,7 +1,8 @@
 # php-ext-varint
 
 ## Intro
-This is port of [php-kiss-varint](https://github.com/Muvon/php-kiss-varint) package into `PHP` extension by using `Rust`.
+
+This is a port of [php-kiss-varint](https://github.com/Muvon/php-kiss-varint) package into the `PHP` extension by using `Rust`.
 
 The work is still in progress but it works! and benchmarks are great as we can see for now.
 
@@ -9,18 +10,30 @@ The work is still in progress but it works! and benchmarks are great as we can s
 
 Here are benchmarks vs `php-kiss-varint` package
 
-The numbers are avg for single call on 100000 runs
+The numbers are avg for a single call on 1 mln runs
 
 | test | time | perf increased |
 |-|-|-|
-|🐘 Composer package packUint & bin2hex | 0.000000489 | 1x |
-|🦀 PHP extension packUintHex| 0.000000169 | 2.89x |
-|🐘 Composer package packInt & bin2hex| 0.000003175 | 1x |
-|🦀 PHP extension packIntHex| 0.000000175 | 18.14x |
-|🐘 Composer package readUint & hex2bin| 0.000001576| 1x |
-|🦀 PHP extension readUintHex| 0.000000216 | 7.29x |
-|🐘Composer package readInt & hex2bin| 0.000003129 | 1x |
-|🦀 PHP extension readIntHex| 0.000000245 | 12.77x |
+| 🐘 Composer package packUint (> PHP_INT_MAX) | 0.000001493 | 1x |
+| 🦀 PHP extension packUint (> PHP_INT_MAX): |0.000000174 | 8.58x |
+| 🐘 Composer package packUintHex (> PHP_INT_MAX) | 0.000001495 | 1x |
+| 🦀 PHP extension packUint & bin2hex (> PHP_INT_MAX): | 0.000000188 | 7.95x |
+| 🐘 Composer package packUint (= PHP_INT_MAX) | 0.000001157 | 1x |
+| 🦀 PHP extension packUint (= PHP_INT_MAX): |0.000000181 | 6.39x |
+| 🐘 Composer package packUint & bin2hex (= PHP_INT_MAX) | 0.000001200 | 1x |
+| 🦀 PHP extension packUintHex (= PHP_INT_MAX): |0.000000192 | 6.25x |
+| 🐘 Composer package packInt – negative | 0.000003072 | 1x |
+| 🦀 PHP extension packInt – negative | 0.000000153 | 20.07x |
+| 🐘 Composer package packInt & bin2hex - negative | 0.000003130 | 1x |
+| 🦀 PHP extension packIntHex - negative | 0.000000167 | 18.74x |
+| 🐘 Composer package packInt – positive | 0.000002064 | 1x |
+| 🦀 PHP extension packInt – positive | 0.000000153 | 13.49x |
+| 🐘 Composer package packInt & bin2hex - positive | 0.000002108 | 1x |
+| 🦀 PHP extension packIntHex - positive | 0.000000168 | 12.54x |
+| 🐘 Composer package readUint & hex2bin | 0.000001563 | 1x |
+| 🦀 PHP extension readUintHex | 0.000000336 | 4.65x |
+| 🐘 Composer package readInt & hex2bin | 0.000003037 | 1x |
+| 🦀 PHP extension readIntHex | 0.000000229 | 13.26x |
 
 ## How to build
 
