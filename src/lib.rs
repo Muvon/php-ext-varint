@@ -11,8 +11,16 @@ pub struct VarInt;
 
 #[php_impl(rename_methods = "camelCase")]
 impl VarInt {
+    // We use String here because PHP_INT_MAX is signed integer
+    // But we are working with unsigned here
     #[public]
-    pub fn pack_uint(value: u64) -> Binary<u8> {
+    pub fn pack_uint(value: &str) -> Binary<u8> {
+        let value = value.parse::<u64>().expect("Failed to parse input into uint64");
+        Self::real_pack_uint(value)
+    }
+
+    // Helper function to relfect u64 instead of &str for php
+    fn real_pack_uint(value: u64) -> Binary<u8> {
         let mut h: Vec<u8> = vec![];
         let mut value = value;
         while value >= 0x80 {
@@ -26,7 +34,7 @@ impl VarInt {
     }
 
     #[public]
-    pub fn pack_uint_hex(value: u64) -> String {
+    pub fn pack_uint_hex(value: &str) -> String {
         hex_string(Self::pack_uint(value).as_slice())
     }
 
@@ -36,7 +44,7 @@ impl VarInt {
         if value < 0 {
             ux = !ux;
         }
-        Self::pack_uint(ux)
+        Self::real_pack_uint(ux)
     }
 
     #[public]
@@ -44,8 +52,7 @@ impl VarInt {
         hex_string(Self::pack_int(value).as_slice())
     }
 
-    #[public]
-    pub fn read_uint(bin: Binary<u8>, offset: Option<u64>, max_len: Option<u64>) -> Result<Vec<u64>, PhpException> {
+    fn real_read_uint(bin: Binary<u8>, offset: Option<u64>, max_len: Option<u64>) -> Result<Vec<u64>, PhpException> {
         let offset = offset.unwrap_or(0);
         let max_len = max_len.unwrap_or(0);
 
@@ -58,7 +65,7 @@ impl VarInt {
             let u = u.to_owned();
             if u < 0x80 {
                 if max_len > 0 && (i > max_i || i == max_i && u > 1) {
-                    return Err(PhpException::from_class::<VarIntError>("Failed to parse".into()));
+                    return Err(PhpException::from_class::<VarIntError>("Value overwlow".into()));
                 }
                 return Ok(vec![(x | (u as u64) << s) as u64, i + 1]);
             }
@@ -71,14 +78,22 @@ impl VarInt {
     }
 
     #[public]
-    pub fn read_uint_hex(hex: String, offset: Option<u64>, max_len: Option<u64>) -> Result<Vec<u64>, PhpException> {
+    pub fn read_uint(bin: Binary<u8>, offset: Option<u64>, max_len: Option<u64>) -> Result<Vec<String>, PhpException> {
+        match Self::real_read_uint(bin, offset, max_len) {
+            Ok(res) => Ok(res.iter().map(|x| x.to_string()).collect()),
+            Err(err) => Err(err),
+        }
+    }
+
+    #[public]
+    pub fn read_uint_hex(hex: String, offset: Option<u64>, max_len: Option<u64>) -> Result<Vec<String>, PhpException> {
         let bin = Self::try_hex_to_binary(hex)?;
         Self::read_uint(bin, offset, max_len)
     }
 
     #[public]
     pub fn read_int(bin: Binary<u8>, offset: Option<u64>, max_len: Option<u64>) -> Result<Vec<i64>, PhpException> {
-        let input = Self::read_uint(bin, offset, max_len)?;
+        let input = Self::real_read_uint(bin, offset, max_len)?;
         let (ux, offset) = match input[..] {
             [a, b] => (a, b),
             _ => unreachable!(),
@@ -101,7 +116,8 @@ impl VarInt {
 
     #[public]
     pub fn read_bool(bin: Binary<u8>, offset: Option<u64>) -> Result<Vec<u64>, PhpException> {
-        Self::read_uint(bin, offset, Some(0u64))
+        let result = Self::read_uint(bin, offset, Some(0u64))?;
+        Ok(result.iter().map(|x| x.parse::<u64>().unwrap_or(0)).collect())
     }
 
     #[public]
@@ -123,7 +139,7 @@ impl VarInt {
 }
 
 #[php_function]
-pub fn varint_pack_uint(value: u64) -> Binary<u8> {
+pub fn varint_pack_uint(value: &str) -> Binary<u8> {
     VarInt::pack_uint(value)
 }
 
@@ -133,7 +149,7 @@ pub fn varint_pack_int(value: i64) -> Binary<u8> {
 }
 
 #[php_function]
-pub fn varint_read_uint(bin: Binary<u8>, offset: Option<u64>, max_len: Option<u64>) -> Result<Vec<u64>, PhpException> {
+pub fn varint_read_uint(bin: Binary<u8>, offset: Option<u64>, max_len: Option<u64>) -> Result<Vec<String>, PhpException> {
     VarInt::read_uint(bin, offset, max_len)
 }
 
@@ -187,11 +203,11 @@ mod tests {
     #[test]
     pub fn test_pack_and_unpack_unsigned_ints() -> () {
         let tests = HashMap::from([
-            (0, "00"),
-            (35442, "f29402"),
-            (523472346, "da9bcef901"),
-            (23425234862394, "ba82b6e6e1a905"),
-            (7342523486232352394, "8aaddebed5c6f8f265"),
+            ("0", "00"),
+            ("35442", "f29402"),
+            ("523472346", "da9bcef901"),
+            ("23425234862394", "ba82b6e6e1a905"),
+            ("7342523486232352394", "8aaddebed5c6f8f265"),
         ]);
 
         test_fn!(pack_uint_hex, read_uint_hex, tests);
