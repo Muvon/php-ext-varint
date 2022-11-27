@@ -1,6 +1,6 @@
 #![cfg_attr(windows, feature(abi_vectorcall))]
-use ext_php_rs::{prelude::*, binary::Binary, zend::ce};
-use faster_hex::{hex_string, hex_decode};
+use ext_php_rs::{binary::Binary, prelude::*, zend::ce};
+use faster_hex::{hex_decode, hex_string};
 
 #[php_class(name = "Muvon\\Ext\\VarIntError")]
 #[extends(ce::exception())]
@@ -26,10 +26,10 @@ impl VarInt {
         while value >= 0x80 {
             let u = (value & 0xff | 0x80) as u8;
             h.push(u);
-            value = value >> 7;
+            value >>= 7;
         }
 
-        h.push((value as u8) & 0xff);
+        h.push(value as u8);
         Binary::new(h)
     }
 
@@ -69,7 +69,7 @@ impl VarInt {
                 }
                 return Ok(vec![(x | (u as u64) << s) as u64, i + 1]);
             }
-            x = x | ((u & 0x7f) as u64) << s;
+            x |= ((u & 0x7f) as u64) << s;
             s += 7;
             i += 1;
         }
@@ -128,11 +128,14 @@ impl VarInt {
 
     fn try_hex_to_binary(hex: String) -> Result<Binary<u8>, PhpException> {
         let len = hex.len() / 2;
-        let mut dst = Vec::with_capacity(len);
-        dst.resize(len, 0);
+        let mut dst = vec![0; len];
         match hex_decode(hex.as_bytes(), &mut dst) {
             Ok(_) => (),
-            Err(_) => return Err(PhpException::from_class::<VarIntError>("Failed to decode hex input".into())),
+            Err(_) => {
+                return Err(PhpException::from_class::<VarIntError>(
+                    "Failed to decode hex input".into(),
+                ))
+            }
         };
         Ok(Binary::new(dst))
     }
@@ -149,7 +152,11 @@ pub fn varint_pack_int(value: i64) -> Binary<u8> {
 }
 
 #[php_function]
-pub fn varint_read_uint(bin: Binary<u8>, offset: Option<u64>, max_len: Option<u64>) -> Result<Vec<String>, PhpException> {
+pub fn varint_read_uint(
+    bin: Binary<u8>,
+    offset: Option<u64>,
+    max_len: Option<u64>,
+) -> Result<Vec<String>, PhpException> {
     VarInt::read_uint(bin, offset, max_len)
 }
 
@@ -187,10 +194,7 @@ mod tests {
     macro_rules! test_fn {
         ($pack_fn:ident, $read_fn:ident, $tests:expr) => {
             for (input, expected) in $tests {
-                assert_eq!(
-                    VarInt::$pack_fn(input),
-                    expected
-                );
+                assert_eq!(VarInt::$pack_fn(input), expected);
 
                 if let Ok(result) = VarInt::$read_fn(expected.into(), Some(0), Some(0)) {
                     assert_eq!(result[0], input);
@@ -201,7 +205,7 @@ mod tests {
         };
     }
     #[test]
-    pub fn test_pack_and_unpack_unsigned_ints() -> () {
+    pub fn test_pack_and_unpack_unsigned_ints() {
         let tests = HashMap::from([
             ("0", "00"),
             ("35442", "f29402"),
@@ -213,9 +217,8 @@ mod tests {
         test_fn!(pack_uint_hex, read_uint_hex, tests);
     }
 
-
     #[test]
-    pub fn test_pack_and_unpack_zero_signed_int() -> () {
+    pub fn test_pack_and_unpack_zero_signed_int() {
         let tests = HashMap::from([
             (0, "00"),
             (35442, "e4a904"),

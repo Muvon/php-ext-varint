@@ -1,0 +1,54 @@
+name: test
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - master
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  tests:
+    name: Tests on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2.0.0
+    - name: Build cargo in release mode
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --release --locked
+    - name: Run cargo test
+      run: bin/test --release --locked
+
+  # We run tests in debug also, to make sure that the debug_assertions are hit
+  test-debug:
+    name: Run tests in debug
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2.0.0
+      - name: Build cargo in debug mode
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --locked
+      - name: Run tests in debug
+        run: bin/test --locked

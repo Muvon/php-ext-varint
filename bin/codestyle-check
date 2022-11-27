@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -e
+run="cargo fmt --all -- --check"
+for opt in "$@"; do
+  case "$opt" in
+    --fix)
+      echo 'Fixing fmt checks'
+      run="cargo fmt --all --"
+      ;;
+  esac
+done
+
+$run
